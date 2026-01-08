@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🤖 Franka Robot + ROS2 시스템 가이드
 
 ## 📌 시스템 구조
@@ -324,3 +325,7 @@ colcon build
 
 *작성일: 2026-01-08*
 
+=======
+# Franka_Dual_Arm_PtoP
+Franka and KISTAR_Hand controller setting with Ros2 and SHM
+>>>>>>> cfd07a4f19c98e1707e4049e0999ed613e3c0043
