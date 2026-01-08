@@ -49,6 +49,20 @@ cd /home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand
 
 ### 터미널 2: ROS2 브리지
 
+ros2 환경설정
+```bash
+source /opt/ros/humble/setup.bash
+source /home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand/install/setup.bash
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export ROS_DOMAIN_ID=9
+export ROS_LOCALHOST_ONLY=0
+
+ros2 topic echo /franka/arm_target/right
+```
+
+# 그 다음 명령어 실행
+ros2 topic echo /franka/arm_target/right
+
 ```bash
 cd /home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand
 source /opt/ros/humble/setup.bash
@@ -76,8 +90,14 @@ source install/setup.bash
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 export ROS_DOMAIN_ID=9
 export ROS_LOCALHOST_ONLY=0
+
 python3 send_arm_target.py
+
+
+ros2 run rqt_graph rqt_graph
 ```
+
+
 
 **사용법:**
 ```
@@ -97,6 +117,32 @@ python3 send_arm_target.py
 → 로봇이 해당 포즈로 이동합니다! 🤖
 
 ---
+## ✅ 연결 테스트(ros2 topic pub 명령어 사용)
+
+### Robot PC에서:
+```bash
+ros2 topic echo /franka/arm_state/right  # 상태 출력 확인
+```
+
+### Isaac PC에서:
+```bash
+# 상태 수신 테스트
+ros2 topic echo /franka/arm_state/right
+
+# 목표 전송 테스트 (Arm) 예시
+ros2 topic pub --once /franka/arm_target/right \
+  kistar_hand_ros2/msg/FrankaArmTarget \
+  "{joint_targets: [0.5, -0.6, 0.7, -2.4, -0.02, 1.2, 0.2], arm_id: 0}"
+
+
+# 목표 전송 테스트 (Hand - 닫기) 예시
+ros2 topic pub --once /hand/target/right \
+  kistar_hand_ros2/msg/HandTarget \
+  "{joint_targets: [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000], movement_duration: 1.0, hand_id: 0}"
+```
+
+→ 로봇이 움직이면 연결 성공! 🎉
+
 
 # Part 2: Isaac PC 연동 가이드
 
@@ -159,86 +205,9 @@ ros2 topic list
 # /franka/arm_target/right
 ```
 
----
 
-## 💻 Isaac PC 코드 예제
 
-```python
-#!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from kistar_hand_ros2.msg import FrankaArmState, FrankaArmTarget
 
-class IsaacBridge(Node):
-    def __init__(self):
-        super().__init__('isaac_bridge')
-        
-        # 로봇 상태 수신 (100Hz)
-        self.state_sub = self.create_subscription(
-            FrankaArmState,
-            '/franka/arm_state/right',
-            self.state_callback,
-            10
-        )
-        
-        # 목표 위치 전송
-        self.target_pub = self.create_publisher(
-            FrankaArmTarget,
-            '/franka/arm_target/right',
-            10
-        )
-        
-        self.get_logger().info('Isaac Bridge 시작!')
-    
-    def state_callback(self, msg):
-        # 현재 로봇 상태
-        positions = list(msg.joint_positions)
-        torques = list(msg.joint_torques)
-        self.get_logger().info(f'현재 위치: {positions}')
-    
-    def send_target(self, joint_targets):
-        msg = FrankaArmTarget()
-        msg.arm_id = 0  # Right arm
-        msg.joint_targets = joint_targets
-        self.target_pub.publish(msg)
-        self.get_logger().info(f'목표 전송: {joint_targets}')
-
-def main():
-    rclpy.init()
-    node = IsaacBridge()
-    
-    # 테스트: 목표 위치 전송
-    import time
-    time.sleep(2)  # 연결 대기
-    node.send_target([0.5, -0.6, 0.7, -2.4, -0.02, 1.2, 0.2])
-    
-    rclpy.spin(node)
-
-if __name__ == '__main__':
-    main()
-```
-
----
-
-## ✅ 연결 테스트
-
-### Robot PC에서:
-```bash
-ros2 topic echo /franka/arm_state/right  # 상태 출력 확인
-```
-
-### Isaac PC에서:
-```bash
-# 상태 수신 테스트
-ros2 topic echo /franka/arm_state/right
-
-# 목표 전송 테스트
-ros2 topic pub --once /franka/arm_target/right \
-  kistar_hand_ros2/msg/FrankaArmTarget \
-  "{joint_targets: [0.5, -0.6, 0.7, -2.4, -0.02, 1.2, 0.2], arm_id: 0}"
-```
-
-→ 로봇이 움직이면 연결 성공! 🎉
 
 ---
 
@@ -353,5 +322,5 @@ colcon build
 
 ---
 
-*작성일: 2025-12-10*
+*작성일: 2026-01-08*
 
