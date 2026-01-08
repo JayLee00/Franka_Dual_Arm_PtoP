@@ -1,0 +1,27 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from kistar_hand_ros2/msg/FrankaArmState.msg
+// generated code does not contain a copyright notice
+
+
+module kistar_hand_ros2 {
+  module msg {
+    typedef double double__7[7];
+    @verbatim (language="comment", text=
+      "Franka Arm 현재 상태 (shm -> ROS2)" "\n"
+      "Arm_Num = 2 (Left, Right)" "\n"
+      "Arm_DOF = 7")
+    struct FrankaArmState {
+      @verbatim (language="comment", text=
+        "Arm_j_pos")
+      double__7 joint_positions;
+
+      @verbatim (language="comment", text=
+        "Arm_j_tq")
+      double__7 joint_torques;
+
+      @verbatim (language="comment", text=
+        "0=Right, 1=Left")
+      uint8 arm_id;
+    };
+  };
+};

@@ -1,0 +1,27 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from kistar_hand_ros2/msg/HandTarget.msg
+// generated code does not contain a copyright notice
+
+
+module kistar_hand_ros2 {
+  module msg {
+    typedef int16 int16__16[16];
+    @verbatim (language="comment", text=
+      "Hand 목표 (ROS2 -> shm)" "\n"
+      "Hand_Num = 2 (Left, Right)" "\n"
+      "Hand_DOF = 16")
+    struct HandTarget {
+      @verbatim (language="comment", text=
+        "Hand_j_tar")
+      int16__16 joint_targets;
+
+      @verbatim (language="comment", text=
+        "hand_movement_duration")
+      double movement_duration;
+
+      @verbatim (language="comment", text=
+        "0=Right, 1=Left")
+      uint8 hand_id;
+    };
+  };
+};

@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand/build/cmake_install.cmake",
+		"/home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand/build/libfranka/common/cmake_install.cmake",
+		"/home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand/build/test/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

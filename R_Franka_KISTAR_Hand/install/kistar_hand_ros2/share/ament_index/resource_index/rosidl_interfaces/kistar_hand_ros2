@@ -1,0 +1,8 @@
+msg/FrankaArmState.idl
+msg/FrankaArmState.msg
+msg/FrankaArmTarget.idl
+msg/FrankaArmTarget.msg
+msg/HandState.idl
+msg/HandState.msg
+msg/HandTarget.idl
+msg/HandTarget.msg

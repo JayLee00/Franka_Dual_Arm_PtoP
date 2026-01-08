@@ -1,0 +1,35 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from kistar_hand_ros2/msg/HandState.msg
+// generated code does not contain a copyright notice
+
+
+module kistar_hand_ros2 {
+  module msg {
+    typedef int16 int16__16[16];
+    typedef int16 int16__12[12];
+    typedef int16 int16__60[60];
+    @verbatim (language="comment", text=
+      "Hand 현재 상태 (shm -> ROS2)" "\n"
+      "Hand_Num = 2 (Left, Right)" "\n"
+      "Hand_DOF = 16" "\n"
+      "Kinesthetic_Sensor_DATA_NUM = 12 (4*3)" "\n"
+      "Tactile_Sensor_DATA_NUM = 60 (4*15)")
+    struct HandState {
+      @verbatim (language="comment", text=
+        "Hand_j_pos")
+      int16__16 joint_positions;
+
+      @verbatim (language="comment", text=
+        "Hand_j_kin")
+      int16__12 kinesthetic_sensors;
+
+      @verbatim (language="comment", text=
+        "Hand_j_tac")
+      int16__60 tactile_sensors;
+
+      @verbatim (language="comment", text=
+        "0=Right, 1=Left")
+      uint8 hand_id;
+    };
+  };
+};

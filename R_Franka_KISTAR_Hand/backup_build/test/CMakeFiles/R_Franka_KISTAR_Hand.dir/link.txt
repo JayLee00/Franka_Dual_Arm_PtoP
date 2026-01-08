@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic CMakeFiles/R_Franka_KISTAR_Hand.dir/R_Franka_KISTAR_Hand.cpp.o CMakeFiles/R_Franka_KISTAR_Hand.dir/__/libfranka/examples/examples_common.cpp.o -o R_Franka_KISTAR_Hand  -Wl,-rpath,/home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand/build: ../libsoem.a ../libfranka.so -lpthread -lrt -lpthread -lrt 

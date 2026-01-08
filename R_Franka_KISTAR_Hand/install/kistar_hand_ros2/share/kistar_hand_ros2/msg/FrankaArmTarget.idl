@@ -1,0 +1,23 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from kistar_hand_ros2/msg/FrankaArmTarget.msg
+// generated code does not contain a copyright notice
+
+
+module kistar_hand_ros2 {
+  module msg {
+    typedef double double__7[7];
+    @verbatim (language="comment", text=
+      "Franka Arm 목표 (ROS2 -> shm)" "\n"
+      "Arm_Num = 2 (Left, Right)" "\n"
+      "Arm_DOF = 7")
+    struct FrankaArmTarget {
+      @verbatim (language="comment", text=
+        "Arm_j_tar")
+      double__7 joint_targets;
+
+      @verbatim (language="comment", text=
+        "0=Right, 1=Left")
+      uint8 arm_id;
+    };
+  };
+};

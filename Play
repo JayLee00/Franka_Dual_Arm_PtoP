@@ -1,0 +1,9 @@
+
+cd /home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/L_Franka_Gripper/build/test
+sudo su
+./L_Franka_Gripper
+
+
+cd /home/prime/KISTAR_Hand_RTOS-master/Franka_Dual_Arm_PtoP/R_Franka_KISTAR_Hand/build/test
+sudo su
+./R_Franka_KISTAR_Hand
