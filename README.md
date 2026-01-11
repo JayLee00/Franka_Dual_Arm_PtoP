@@ -153,6 +153,56 @@ ros2 topic pub --once /franka/arm_target/right \
   kistar_hand_ros2/msg/FrankaArmTarget \
   "{joint_targets: [0.5, -0.6, 0.7, -2.4, -0.02, 1.2, 0.2], arm_id: 0}"
 
+[
+  joint1:
+  limit:
+    lower:     -2.8973
+    upper:      2.8973
+    velocity:   2.1750
+    effort:    87.0
+
+joint2:
+  limit:
+    lower:     -1.7628
+    upper:      1.7628
+    velocity:   2.1750
+    effort:    87.0
+
+joint3:
+  limit:
+    lower:     -2.8973
+    upper:      2.8973
+    velocity:   2.1750
+    effort:    87.0
+
+joint4:
+  limit:
+    lower:     -3.0718
+    upper:     -0.0698
+    velocity:   2.1750
+    effort:    87.0
+
+joint5:
+  limit:
+    lower:     -2.8973
+    upper:      2.8973
+    velocity:   2.6100
+    effort:    12.0
+
+joint6:
+  limit:
+    lower:     -0.0175
+    upper:      3.7525
+    velocity:   2.6100
+    effort:    12.0
+
+joint7:
+  limit:
+    lower:     -2.8973
+    upper:      2.8973
+    velocity:   2.6100
+    effort:    12.0
+]
 
 # 목표 전송 테스트 (Hand - 닫기) 예시
 ros2 topic pub --once /hand/target/right \
