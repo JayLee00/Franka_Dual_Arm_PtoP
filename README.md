@@ -210,6 +210,12 @@ ros2 topic pub --once /hand/target/right \
   "{joint_targets: [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000], movement_duration: 1.0, hand_id: 0}"
 ```
 
+ros2 topic pub --once /hand/target/right \
+  kistar_hand_ros2/msg/HandTarget \
+  "{joint_targets: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], movement_duration: 1.0, hand_id: 0}"
+```
+
+
 → 로봇이 움직이면 연결 성공! 🎉
 
 

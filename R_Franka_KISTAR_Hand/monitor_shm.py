@@ -274,6 +274,18 @@ class SHMMonitor:
             offset = self.offset_Hand_j_tar + h * Hand_DOF * 2
             data['Hand_j_tar'][h] = list(self.read_int16_array(offset, Hand_DOF))
         
+        # Hand_j_kin[2][12] - Kinesthetic 센서
+        data['Hand_j_kin'] = {}
+        for h in range(Hand_Num):
+            offset = self.offset_Hand_j_kin + h * Kinesthetic_Sensor_DATA_NUM * 2
+            data['Hand_j_kin'][h] = list(self.read_int16_array(offset, Kinesthetic_Sensor_DATA_NUM))
+
+        # Hand_j_tac[2][60] - Tactile 센서
+        data['Hand_j_tac'] = {}
+        for h in range(Hand_Num):
+            offset = self.offset_Hand_j_tac + h * Tactile_Sensor_DATA_NUM * 2
+            data['Hand_j_tac'][h] = list(self.read_int16_array(offset, Tactile_Sensor_DATA_NUM))
+        
         return data
     
     def print_summary(self, arm_data, hand_data):
@@ -291,6 +303,8 @@ class SHMMonitor:
         print(f"\n✋ 오른쪽 손 (Hand_R):")
         print(f"  현재 조인트 각도: {hand_data['Hand_j_pos'][Hand_R]}")
         print(f"  목표 조인트 각도: {hand_data['Hand_j_tar'][Hand_R]}")
+        print(f"  Kinesthetic 센서: {hand_data['Hand_j_kin'][Hand_R]}")
+        print(f"  Tactile 센서:     {hand_data['Hand_j_tac'][Hand_R]}")
         
         print("\n" + "="*80)
     
