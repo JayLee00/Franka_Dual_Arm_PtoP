@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
    //pthread_create(&thread6, NULL, &udp_server_thread, (void *)&thread_args6);
 
    // 프랑카 스레드 시작 (Arm 제어용)
-   pthread_create(&thread3, NULL, &franka_control_thread_R, (void *)&thread_args2);
+   // pthread_create(&thread3, NULL, &franka_control_thread_R, (void *)&thread_args2);
    
    // EtherCAT 스레드 시작 (Hand 제어용)
    pthread_create(&thread1, NULL, &ecatthread, (void *)&thread_args1);

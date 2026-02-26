@@ -27,39 +27,42 @@ public:
         }
         RCLCPP_INFO(this->get_logger(), "✅ Shared Memory 연결 성공");
 
+        // QoS Profile for high-frequency communication (1kHz)
+        auto qos = rclcpp::QoS(rclcpp::KeepLast(10)).best_effort();
+
         // Publishers (shm -> ROS2)
         // Franka Arm State Publishers
         pub_franka_arm_state_R_ = this->create_publisher<kistar_hand_ros2::msg::FrankaArmState>(
-            "franka/arm_state/right", 10);
+            "franka/arm_state/right", qos);
         pub_franka_arm_state_L_ = this->create_publisher<kistar_hand_ros2::msg::FrankaArmState>(
-            "franka/arm_state/left", 10);
+            "franka/arm_state/left", qos);
 
         // Hand State Publishers
         pub_hand_state_R_ = this->create_publisher<kistar_hand_ros2::msg::HandState>(
-            "hand/state/right", 10);
+            "hand/state/right", qos);
         pub_hand_state_L_ = this->create_publisher<kistar_hand_ros2::msg::HandState>(
-            "hand/state/left", 10);
+            "hand/state/left", qos);
 
         // Subscribers (ROS2 -> shm)
         // Franka Arm Target Subscribers
         sub_franka_arm_target_R_ = this->create_subscription<kistar_hand_ros2::msg::FrankaArmTarget>(
-            "franka/arm_target/right", 10,
+            "franka/arm_target/right", qos,
             std::bind(&ShmRos2Bridge::frankaArmTargetCallback_R, this, std::placeholders::_1));
         sub_franka_arm_target_L_ = this->create_subscription<kistar_hand_ros2::msg::FrankaArmTarget>(
-            "franka/arm_target/left", 10,
+            "franka/arm_target/left", qos,
             std::bind(&ShmRos2Bridge::frankaArmTargetCallback_L, this, std::placeholders::_1));
 
         // Hand Target Subscribers
         sub_hand_target_R_ = this->create_subscription<kistar_hand_ros2::msg::HandTarget>(
-            "hand/target/right", 10,
+            "hand/target/right", qos,
             std::bind(&ShmRos2Bridge::handTargetCallback_R, this, std::placeholders::_1));
         sub_hand_target_L_ = this->create_subscription<kistar_hand_ros2::msg::HandTarget>(
-            "hand/target/left", 10,
+            "hand/target/left", qos,
             std::bind(&ShmRos2Bridge::handTargetCallback_L, this, std::placeholders::_1));
 
-        // Timer for publishing state (100Hz = 10ms)
+        // Timer for publishing state (1kHz = 1ms)
         timer_ = this->create_wall_timer(
-            10ms, std::bind(&ShmRos2Bridge::publishStates, this));
+            1ms, std::bind(&ShmRos2Bridge::publishStates, this));
 
         RCLCPP_INFO(this->get_logger(), "🚀 ROS2-SHM Bridge 노드 시작됨");
     }
@@ -72,9 +75,10 @@ public:
         }
     }
 
-private:
+public:
     void publishStates()
     {
+        auto start = std::chrono::high_resolution_clock::now();
         // Franka Right Arm State
         auto msg_franka_R = kistar_hand_ros2::msg::FrankaArmState();
         msg_franka_R.arm_id = Arm_R;
@@ -128,18 +132,29 @@ private:
             msg_hand_L.tactile_sensors[i] = shm_msgs_->Hand_j_tac[Hand_L][i];
         }
         pub_hand_state_L_->publish(msg_hand_L);
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        
+        // Log if execution time exceeds 1000 microseconds (1ms)
+        if (duration.count() > 1000)
+        {
+            RCLCPP_WARN(this->get_logger(), "publishStates() took %ld us, longer than the 1ms budget.", duration.count());
+        }
     }
+
+private:
 
     void frankaArmTargetCallback_R(const kistar_hand_ros2::msg::FrankaArmTarget::SharedPtr msg)
     {
         // arm_id 체크 없이 항상 Right로 처리 (토픽 자체가 right이므로)
-        RCLCPP_INFO(this->get_logger(), "📥 Arm Target R 수신! arm_id=%d", msg->arm_id);
+        // RCLCPP_INFO(this->get_logger(), "📥 Arm Target R 수신! arm_id=%d", msg->arm_id);
         for (int i = 0; i < Arm_DOF; i++)
         {
             shm_msgs_->Arm_j_tar[Arm_R][i] = msg->joint_targets[i];
         }
-        RCLCPP_INFO(this->get_logger(), "   Target[0]: %.4f, Target[1]: %.4f", 
-                    shm_msgs_->Arm_j_tar[Arm_R][0], shm_msgs_->Arm_j_tar[Arm_R][1]);
+        // RCLCPP_INFO(this->get_logger(), "   Target[0]: %.4f, Target[1]: %.4f", 
+        //             shm_msgs_->Arm_j_tar[Arm_R][0], shm_msgs_->Arm_j_tar[Arm_R][1]);
     }
 
     void frankaArmTargetCallback_L(const kistar_hand_ros2::msg::FrankaArmTarget::SharedPtr msg)
@@ -203,7 +218,12 @@ int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<ShmRos2Bridge>();
-    rclcpp::spin(node);
+    
+    // Use a MultiThreadedExecutor to allow parallel processing of callbacks
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node);
+    executor.spin();
+    
     rclcpp::shutdown();
     return 0;
 }
