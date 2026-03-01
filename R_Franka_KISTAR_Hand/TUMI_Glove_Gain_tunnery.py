@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-TUMI Glove Publisher: 16-DOF tactile encoder glove → 16-DOF robot hand target.
+TUMI Glove Gain Tunery: 손가락별 텍타일 gain 튜닝 실험용.
 
-시리얼 포트: 글러브 펌웨어가 한 줄에 16개 조인트 + 21개 촉각(Thumb7, Index7, Middle7) 출력.
-- 모드 1: 1:1 각도 매칭
-- 모드 2: 스케일 ~1.1 (조금 더 꽉 잡기)
-- 모드 3: target = encoder + 1000*gain*(tactile/1000000) (촉각 낮아지면 target 감소)
+- 기본: 모든 관절 0
+- ENABLE_THUMB/INDEX/MIDDLE 로 실험 대상 손가락 선택
+- 손가락별 MCP/PIP/DIP gain 개별 설정 가능
 """
 
 import rclpy
@@ -13,20 +12,19 @@ from rclpy.node import Node
 import serial
 import time
 from kistar_hand_ros2.msg import HandTarget
-from std_msgs.msg import Float32MultiArray, Int16MultiArray
+from std_msgs.msg import Float32MultiArray
 
 # 한 줄 데이터: 16 joint (int) + 21 tactile (float, 소수점 2자리)
 NUM_JOINTS = 16
 NUM_TACTILE = 21
 
-# 설정 (코드에서 직접 수정 가능)
-# MODE: 1=1:1, 2=scale, 3=tactile, 4=scale+tactile
-MODE = 3
-# SCALE: 모드 2,4에서 사용 (1.0=1:1, 1.1=더 꽉 잡기)
-SCALE = 1.1
-# 모드 3,4: target = encoder + 1000*gain*(tactile/1000000)
-# 손가락별 gain (코드에서 직접 수정)
+# 실험 대상 손가락 ON/OFF (True=활성, False=비활성)
+ENABLE_THUMB  = False
+ENABLE_INDEX  = False
+ENABLE_MIDDLE = True
+ENABLE_RING   = False  # Ring 택타일 없음 -> Middle 과 동기화 시 사용
 
+# 손가락별 gain (TUMI_Glove_Publisher.py 29-53 기준, 동일)
 # Thumb (텍타일 0-6)
 thumb_gain_ip = 5.0
 thumb_gain_mcp = 5.0
@@ -42,16 +40,17 @@ middle_gain_mcp_flexion = 5.0
 # Ring (택타일 없음 -> Middle 과 동기화)
 ring_gain_dip = 5.0
 ring_gain_pip = 5.0
-ring_gain_mcp_flexion= 2.5
+ring_gain_mcp_flexion = 2.5
 TACTILE_PER_FINGER = 7  # Thumb 0-6, Index 7-13, Middle 14-20
 
-# 로봇 핸드 16 joint 인덱스 (손가락별)
+# 로봇 핸드 16 joint 인덱스 (TUMI_Glove_Publisher.py 29-53 기준, 동일)
 # 0-3: Thumb, 4-7: Index, 8-11: Middle, 12-15: Ring
 joint_thumb_cmc_opposition, joint_thumb_cmc_abduction, joint_thumb_mcp, joint_thumb_ip = 0, 1, 2, 3
 joint_index_mcp_abduction, joint_index_mcp_flexion, joint_index_pip, joint_index_dip = 4, 5, 6, 7
 joint_middle_mcp_abduction, joint_middle_mcp_flexion, joint_middle_pip, joint_middle_dip = 8, 9, 10, 11
 joint_ring_mcp_abduction, joint_ring_mcp_flexion, joint_ring_pip, joint_ring_dip = 12, 13, 14, 15
-# 조인트별 클램프 (펌웨어와 동일)
+
+# 조인트별 클램프 (TUMI_Glove_Publisher.py 동일)
 JOINT_LIMITS = []
 for i in range(16):
     if i in (4, 8, 12):
@@ -89,19 +88,19 @@ def tactile_max(tactiles: list, start: int, count: int = TACTILE_PER_FINGER) -> 
     return max(s) if s else 0.0
 
 
-class TUMIGlovePublisher(Node):
+class TUMIGloveGainTunery(Node):
     def __init__(self):
-        super().__init__('tumi_glove_publisher_node')
+        super().__init__('tumi_glove_gain_tunery_node')
         self.publisher_ = self.create_publisher(HandTarget, '/hand/target/right', 10)
         self.tactile_pub_ = self.create_publisher(Float32MultiArray, '/glove/tactile', 10)
-        self.encoder_pub_ = self.create_publisher(Int16MultiArray, '/glove/encoder', 10)
 
         # ROS 파라미터
         self.declare_parameter('port', '/dev/ttyUSB0')
         self.declare_parameter('baudrate', 115200)
-        self.declare_parameter('mode', MODE)
-        self.declare_parameter('scale', SCALE)
-        # 모드 3,4: 손가락별 MCP/PIP/DIP gain (상단 변수에서 수정)
+        self.declare_parameter('enable_thumb', ENABLE_THUMB)
+        self.declare_parameter('enable_index', ENABLE_INDEX)
+        self.declare_parameter('enable_middle', ENABLE_MIDDLE)
+        self.declare_parameter('enable_ring', ENABLE_RING)
         self.declare_parameter('publish_tactile', True)  # False 시 촉각 토픽 미발행 (히트맵 viz용)
 
         self.serial_port = self.get_parameter('port').get_parameter_value().string_value
@@ -119,76 +118,36 @@ class TUMIGlovePublisher(Node):
 
         self.timer = self.create_timer(0.01, self.timer_callback)
 
-    def _get_mode_params(self):
-        return {'mode': MODE, 'scale': SCALE}
-
     def _compute_targets(self, joints: list, tactiles: list) -> list:
-        """모드에 따라 16개 조인트 목표값 계산."""
-        p = self._get_mode_params()
-        mode = p['mode']
-        scale = p['scale']
+        """활성화된 손가락만 텍타일에 따라 눌림, 나머지 0. (TUMI_Glove_Publisher 기준)"""
+        out = [0.0] * NUM_JOINTS
 
-        if mode == 1:
-            # 1:1 매칭
-            return [clamp_joint(i, joints[i]) for i in range(NUM_JOINTS)]
-
-        if mode == 2:
-            # 스케일 적용 (중심 기준으로 스케일 후 클램프)
-            out = []
-            for i in range(NUM_JOINTS):
-                lo, hi = JOINT_LIMITS[i]
-                center = (lo + hi) / 2.0
-                scaled = center + (joints[i] - center) * scale
-                out.append(clamp_joint(i, scaled))
-            return out
-
-        if mode == 3:
-            # encoder + 1000*gain*(tactile/1000000)
-            out = [float(joints[i]) for i in range(NUM_JOINTS)]
-            t_max = tactile_max(tactiles, 0)   # Thumb 0-6
-            i_max = tactile_max(tactiles, 7)   # Index 7-13
-            m_max = tactile_max(tactiles, 14)  # Middle 14-20
-            out[joint_thumb_cmc_opposition] += 1000 * thumb_gain_cmc_opposition * (t_max / 1000000)
-            out[joint_thumb_mcp] += 1000 * thumb_gain_mcp * (t_max / 1000000)
-            out[joint_thumb_ip] += 1000 * thumb_gain_ip * (t_max / 1000000)
-            out[joint_index_mcp_flexion] += 1000 * index_gain_mcp_flexion * (i_max / 1000000)
-            out[joint_index_pip] += 1000 * index_gain_pip * (i_max / 1000000)
-            out[joint_index_dip] += 1000 * index_gain_dip * (i_max / 1000000)
-            out[joint_middle_mcp_flexion] += 1000 * middle_gain_mcp_flexion * (m_max / 1000000)
-            out[joint_middle_pip] += 1000 * middle_gain_pip * (m_max / 1000000)
-            out[joint_middle_dip] += 1000 * middle_gain_dip * (m_max / 1000000)
-            out[joint_ring_mcp_flexion] += 1000 * ring_gain_mcp_flexion * (m_max / 1000000)
-            out[joint_ring_pip] += 1000 * ring_gain_pip * (m_max / 1000000)
-            out[joint_ring_dip] += 1000 * ring_gain_dip * (m_max / 1000000)
-            return [clamp_joint(i, out[i]) for i in range(NUM_JOINTS)]
-
-        if mode == 4:
-            # 스케일 + encoder 기반 tactile
-            scaled = []
-            for i in range(NUM_JOINTS):
-                lo, hi = JOINT_LIMITS[i]
-                center = (lo + hi) / 2.0
-                s = center + (joints[i] - center) * scale
-                scaled.append(s)
-            out = [float(scaled[i]) for i in range(NUM_JOINTS)]
+        if ENABLE_THUMB:
             t_max = tactile_max(tactiles, 0)
+            out[joint_thumb_cmc_opposition] = 1000 * thumb_gain_cmc_opposition * (t_max / 1000000)
+            out[joint_thumb_mcp] = 1000 * thumb_gain_mcp * (t_max / 1000000)
+            out[joint_thumb_ip] = 1000 * thumb_gain_ip * (t_max / 1000000)
+
+        if ENABLE_INDEX:
             i_max = tactile_max(tactiles, 7)
+            out[joint_index_mcp_flexion] = 1000 * index_gain_mcp_flexion * (i_max / 1000000)
+            out[joint_index_pip] = 1000 * index_gain_pip * (i_max / 1000000)
+            out[joint_index_dip] = 1000 * index_gain_dip * (i_max / 1000000)
+
+        if ENABLE_MIDDLE:
             m_max = tactile_max(tactiles, 14)
-            out[joint_thumb_cmc_opposition] += 1000 * thumb_gain_cmc_opposition * (t_max / 1000000)
-            out[joint_thumb_mcp] += 1000 * thumb_gain_mcp * (t_max / 1000000)
-            out[joint_thumb_ip] += 1000 * thumb_gain_ip * (t_max / 1000000)
-            out[joint_index_mcp_flexion] += 1000 * index_gain_mcp_flexion * (i_max / 1000000)
-            out[joint_index_pip] += 1000 * index_gain_pip * (i_max / 1000000)
-            out[joint_index_dip] += 1000 * index_gain_dip * (i_max / 1000000)
-            out[joint_middle_mcp_flexion] += 1000 * middle_gain_mcp_flexion * (m_max / 1000000)
-            out[joint_middle_pip] += 1000 * middle_gain_pip * (m_max / 1000000)
-            out[joint_middle_dip] += 1000 * middle_gain_dip * (m_max / 1000000)
-            return [clamp_joint(i, out[i]) for i in range(NUM_JOINTS)]
+            out[joint_middle_mcp_flexion] = 1000 * middle_gain_mcp_flexion * (m_max / 1000000)
+            out[joint_middle_pip] = 1000 * middle_gain_pip * (m_max / 1000000)
+            out[joint_middle_dip] = 1000 * middle_gain_dip * (m_max / 1000000)
 
+        if ENABLE_RING:
+            # Ring 택타일 없음 -> Middle 과 동기화
+            m_max = tactile_max(tactiles, 14)
+            out[joint_ring_mcp_flexion] = 1000 * ring_gain_mcp_flexion * (m_max / 1000000)
+            out[joint_ring_pip] = 1000 * ring_gain_pip * (m_max / 1000000)
+            out[joint_ring_dip] = 1000 * ring_gain_dip * (m_max / 1000000)
 
-
-        # 모드 1,2,3,4 외: 1:1 폴백
-        return [clamp_joint(i, joints[i]) for i in range(NUM_JOINTS)]
+        return [clamp_joint(i, out[i]) for i in range(NUM_JOINTS)]
 
     def timer_callback(self):
         try:
@@ -203,7 +162,6 @@ class TUMIGlovePublisher(Node):
 
         last_msg = None
         last_tactiles = None
-        last_encoders = None
         while self.ser.in_waiting > 0:
             try:
                 raw_line = self.ser.readline()
@@ -222,7 +180,6 @@ class TUMIGlovePublisher(Node):
                 msg.hand_id = 0
                 last_msg = msg
                 last_tactiles = tactiles
-                last_encoders = joints
             except (UnicodeDecodeError, ValueError) as e:
                 self.get_logger().debug(f'Parse error: {e}')
                 continue
@@ -233,10 +190,6 @@ class TUMIGlovePublisher(Node):
             tac_msg = Float32MultiArray()
             tac_msg.data = [float(v) for v in last_tactiles]
             self.tactile_pub_.publish(tac_msg)
-        if last_encoders is not None:
-            enc_msg = Int16MultiArray()
-            enc_msg.data = [int(v) for v in last_encoders]
-            self.encoder_pub_.publish(enc_msg)
 
     def destroy_node(self):
         if hasattr(self, 'ser') and self.ser and self.ser.is_open:
@@ -247,7 +200,7 @@ class TUMIGlovePublisher(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = TUMIGlovePublisher()
+    node = TUMIGloveGainTunery()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -264,7 +217,6 @@ if __name__ == '__main__':
     main()
 
 #
-# 실행: 워크스페이스에서 source install/setup.bash 후
-#   cd R_Franka_KISTAR_Hand && python3 TUMI_Glove_Publisher.py [--ros-args -p mode:=2 -p scale:=1.1 ...]
-# 자세한 내용은 TUMI_Glove_README.md 참고.
+# 실행: cd R_Franka_KISTAR_Hand && python3 TUMI_Glove_Gain_tunnery.py
+# ENABLE_THUMB/INDEX/MIDDLE 로 실험 대상 선택, 손가락별 GAIN 상단에서 조정.
 #

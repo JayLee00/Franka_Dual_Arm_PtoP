@@ -1,4 +1,41 @@
+# Build
 R_Franka_KISTAR_Hand/build/
+R_Franka_KISTAR_Hand/install/
 L_Franka_Gripper/
 
+# IDE / Editor
 .vscode/
+*.swp
+*.swo
+
+# Clangd / Cache
+.cache/
+*.idx
+
+# Logs
+R_Franka_KISTAR_Hand/log/
+R_Franka_KISTAR_Hand/logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+venv/
+.venv/
+
+# ML/Data (학습 데이터·모델 가중치는 로컬/별도 저장)
+R_Franka_KISTAR_Hand/bc_model/
+R_Franka_KISTAR_Hand/dp_model/
+R_Franka_KISTAR_Hand/dp_model_1/
+R_Franka_KISTAR_Hand/dp_model_2/
+R_Franka_KISTAR_Hand/Behavior_Cloning/
+R_Franka_KISTAR_Hand/HDF5/
+R_Franka_KISTAR_Hand/logs/hdf5_recordings/
+*.hdf5
+*.npz
+*.pt

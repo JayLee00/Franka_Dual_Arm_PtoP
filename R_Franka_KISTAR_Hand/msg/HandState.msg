@@ -4,7 +4,8 @@
 # Kinesthetic_Sensor_DATA_NUM = 12 (4*3)
 # Tactile_Sensor_DATA_NUM = 60 (4*15)
 
-int16[16] joint_positions      # Hand_j_pos
+int16[16] joint_positions      # Hand_j_pos (엔코더 위치)
+int16[16] motor_current        # Hand_j_cur (모터 전류)
 int16[12] kinesthetic_sensors  # Hand_j_kin
 int16[60] tactile_sensors      # Hand_j_tac
 uint8 hand_id                   # 0=Right, 1=Left

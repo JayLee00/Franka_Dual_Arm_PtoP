@@ -1,0 +1,7 @@
+# BC 학습 (bc_train.py, bc_run.py) 용
+# PyTorch는 용량이 커서 아래 명령으로 따로 설치 권장:
+#   pip3 install torch --index-url https://download.pytorch.org/whl/cpu --default-timeout=600
+# 또는 GPU 사용 시: https://pytorch.org/get-started/locally/
+torch>=2.0
+h5py>=3.0
+numpy>=1.20,<2

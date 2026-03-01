@@ -64,9 +64,12 @@ std::ostream& operator<<(std::ostream& ostream, const std::array<T, N>& array) {
 #define SEC_IN_NSEC 1000000000
 #define HAND_NUM 1
 
-#define Hand_Data_Read_Byte_Num 128
+#define Hand_Data_Read_Byte_Num 256
 #define Hand_Data_Write_Byte_Num 64
 
+/** EtherCAT 슬레이브가 실제로 보내는 입력 바이트 수 (ec_config 후 설정됨).
+ *  256 미만이면 Tactile[18..59]는 수신되지 않음 → 로봇핸드 TxPDO를 256바이트로 설정해야 함. */
+static uint32_t s_hand_ec_input_bytes = 256;
 
 double time_for_display = 0.0;
 double time_for_display_franka = 0.0;
@@ -387,17 +390,23 @@ void *ecatthread(void *ptr) //KISTAR_Hand_control_thread_R
                 ec_slave[0].outputs[d_l] = kistar_tx.Byte[d_l];
             }
             
-            // read data from ethercat
-            for (int d_l = 0; d_l < Hand_Data_Read_Byte_Num; d_l++)
+            // read data from ethercat (실제 수신 버퍼 크기만 복사, 나머지는 0)
             {
-                kistar_rx.Byte[d_l] = ec_slave[0].inputs[d_l];
+                uint32_t copy_len = (s_hand_ec_input_bytes < Hand_Data_Read_Byte_Num)
+                    ? s_hand_ec_input_bytes : (uint32_t)Hand_Data_Read_Byte_Num;
+                for (uint32_t d_l = 0; d_l < copy_len; d_l++)
+                    kistar_rx.Byte[d_l] = ec_slave[0].inputs[d_l];
+                if (copy_len < (uint32_t)Hand_Data_Read_Byte_Num)
+                    memset(&kistar_rx.Byte[copy_len], 0, Hand_Data_Read_Byte_Num - copy_len);
             }
             
-            // data save: Position, Tactile, Kinesthetic 정보만 SHM에 쓰기
+            // data save: Position, Current, Tactile, Kinesthetic 정보를 SHM에 쓰기
             for (int i = 0; i < Hand_DOF; i++)
             {
                 shm_msgs_->Hand_j_pos[Hand_R][i] = kistar_rx.OUT.Position[i];
                 shm_msgs_->R_Hand_j_pos[i] = shm_msgs_->Hand_j_pos[Hand_R][i];
+                shm_msgs_->Hand_j_cur[Hand_R][i] = kistar_rx.OUT.Current[i];
+                shm_msgs_->R_Hand_j_cur[i] = shm_msgs_->Hand_j_cur[Hand_R][i];
             }
             for (int i = 0; i < Kinesthetic_Sensor_DATA_NUM; i++)
             {
@@ -525,6 +534,14 @@ void ethercat_run()
         {
             /* configure DC options for every DC capable slave found in the list */
             ec_configdc();
+
+            s_hand_ec_input_bytes = ec_slave[0].Ibytes;
+            if (s_hand_ec_input_bytes < (uint32_t)Hand_Data_Read_Byte_Num)
+            {
+                printf("WARNING: EtherCAT input = %u bytes (need %d for full Tactile). "
+                       "Tactile[18..59] will be 0. Fix: set hand controller TxPDO to 256 bytes.\n",
+                       (unsigned)s_hand_ec_input_bytes, Hand_Data_Read_Byte_Num);
+            }
 
             printf("%d slaves found and configured.\n", ec_slavecount);
             /* wait for all slaves to reach SAFE_OP state */
